@@ -1,0 +1,19 @@
+{
+  "name": "dostroy",
+  "version": "1.0.0",
+  "description": "Node.js middleware for DoS-prevention",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DD2497-Project-Group-1/dostroy.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DD2497-Project-Group-1/dostroy/issues"
+  },
+  "homepage": "https://github.com/DD2497-Project-Group-1/dostroy#readme"
+}
