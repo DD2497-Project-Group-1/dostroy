@@ -60,9 +60,9 @@ module.exports = {
 
 dostroy = (config) => {
   const all = !config
-  const slowloris = config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
-  const rateLimit = config.rateLimit ? config.rateLimit : RATELIMIT_DEFAULT
-  const logging = config.logging ? config.logging : LOGGING_DEFAULT
+  const slowloris = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+  const rateLimit = config && config.rateLimit ? config.rateLimit : RATELIMIT_DEFAULT
+  const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
 
   return dostroy = (req, res, next) =>{
     (rateLimit || all) && rateLimiting(req, res, next, logging)
