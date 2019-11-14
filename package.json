@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/DD2497-Project-Group-1/dostroy/issues"
   },
-  "homepage": "https://github.com/DD2497-Project-Group-1/dostroy#readme"
+  "homepage": "https://github.com/DD2497-Project-Group-1/dostroy#readme",
+  "dependencies": {
+    "moment": "^2.24.0"
+  }
 }
