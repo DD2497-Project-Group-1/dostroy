@@ -1,6 +1,10 @@
 const fs = require('fs')
 const moment = require('moment')
 
+const SLOWLORIS_DEFAULT = false // not yet implemented
+const RATELIMITING_DEFAULT = false
+const LOGGING_DEFAULT = false
+
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
 
@@ -20,7 +24,7 @@ const logRateLimiting = (moment, address, interval, requests, status) => {
   logStream.write('[' + formatMoment(moment) + ']{ Address: ' + address + ', interval: ' + interval + 'ms, requests: ' + requests + ', status: ' + status + ' }\n')
 }
 
-const rateLimiting = (req, res, next) => {
+const rateLimiting = (req, res, next, logging) => {
   const address = req.connection.remoteAddress
   const now = moment()
   const addressObject = _rlAddressToRequests[address]
@@ -34,14 +38,14 @@ const rateLimiting = (req, res, next) => {
   const diffSeconds = now.diff(startRequestAt)
   if (diffSeconds < _interval && requests > _limit) {
     addAddressToRequests(address, requests + 1, now)
-    logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
+    logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
     return res.end()
   } else if (diffSeconds < _interval) {
     addAddressToRequests(address, requests + 1, startRequestAt)
   } else {
     addAddressToRequests(address, 1, now)
   }
-  logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ok')
+  logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ok')
   return next()
 }
 
@@ -49,7 +53,17 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-module.exports = {
-  rateLimiting,
-  getAddresses
+dostroy = (config) => {
+  const all = !config
+  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+  const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
+  const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
+
+  return dostroy = (req, res, next) =>{
+    (rl || all) && rateLimiting(req, res, next, logging)
+    //TODO: Add slowloris
+  }
 }
+
+module.exports = dostroy
+module.exports.getAddresses = getAddresses
