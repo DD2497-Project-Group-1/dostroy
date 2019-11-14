@@ -31,4 +31,3 @@ app.get('/', function (req, res) {
   res.send('Hello from example server!')
 })
 ```
-Run your server and see the number of requests logged to console!
