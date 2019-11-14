@@ -1,6 +1,9 @@
 const fs = require('fs')
 const moment = require('moment')
 
+let slowloris = false
+let rateLimit = false
+
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
 
@@ -53,3 +56,12 @@ module.exports = {
   rateLimiting,
   getAddresses
 }
+
+function dostroy(config) {
+  slowloris = config.slowloris
+  rateLimit = config.rateLimit
+  return function dostroy(req, res, next) {}
+
+}
+
+module.exports = dostroy
