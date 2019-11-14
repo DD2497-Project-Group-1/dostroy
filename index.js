@@ -1,8 +1,9 @@
 const fs = require('fs')
 const moment = require('moment')
 
-let slowloris = false
-let rateLimit = false
+const SLOWLORIS_DEFAULT = true
+const RATELIMIT_DEFAULT = true
+const LOGGING_DEFAULT = false
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
@@ -57,9 +58,11 @@ module.exports = {
   getAddresses
 }
 
-function dostroy(config) {
-  slowloris = config.slowloris
-  rateLimit = config.rateLimit
+dostroy = config => {
+  const slowloris = config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+  const rateLimit = config.rateLimit ? config.rateLimit : RATELIMIT_DEFAULT
+  const logging = config.logging ? config.logging : LOGGING_DEFAULT
+
   return function dostroy(req, res, next) {}
 
 }
