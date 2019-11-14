@@ -18,7 +18,12 @@ const dostroy = require('dostroy')
 const express = require('express')
 const app = express()
 
-app.use(dostroy.rateLimiting)
+config = {
+  rateLimiting: true,
+  logging: false
+}
+
+app.use(dostroy(config))
 
 app.listen(3000)
 
