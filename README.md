@@ -12,17 +12,18 @@ Install package:
 ```
 npm install dostroy
 ```
-Example usage to limit the number of requests from one remote address to a Node.js server:
+Example usage to count number of requests in Node.js server:
 ```
 const dostroy = require('dostroy')
 const express = require('express')
 const app = express()
 
-app.use(dostroy.rateLimiting)
+app.use(dostroy.countRequests)
 
 app.listen(3000)
 
 app.get('/', function (req, res) {
+  console.log('Number of requests: ' + dostroy.getRequests())
   res.send('Hello from example server!')
 })
 ```
