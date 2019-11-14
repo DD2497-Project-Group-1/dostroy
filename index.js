@@ -2,7 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const SLOWLORIS_DEFAULT = false // not yet implemented
-const RATELIMIT_DEFAULT = false
+const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 
 const logSession = new Date().toISOString()
@@ -53,22 +53,17 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-module.exports = {
-  rateLimiting,
-  getAddresses
-}
-
 dostroy = (config) => {
   const all = !config
-  const slowloris = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
-  const rateLimit = config && config.rateLimit ? config.rateLimit : RATELIMIT_DEFAULT
+  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+  const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
 
   return dostroy = (req, res, next) =>{
-    (rateLimit || all) && rateLimiting(req, res, next, logging)
+    (rl || all) && rateLimiting(req, res, next, logging)
     //TODO: Add slowloris
   }
-
 }
 
 module.exports = dostroy
+module.exports.getAddresses = getAddresses
