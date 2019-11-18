@@ -53,7 +53,7 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-dostroy = (config) => {
+const dostroy = (config) => {
   const all = !config
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
