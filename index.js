@@ -54,7 +54,7 @@ const getAddresses = () => {
 }
 
 dostroy = (config) => {
-  const all = !config
+  const all = !config || Object.keys(config).length === 0
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
