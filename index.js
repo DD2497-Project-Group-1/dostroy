@@ -4,6 +4,7 @@ const moment = require('moment')
 const SLOWLORIS_DEFAULT = false // not yet implemented
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
+const ERRORHANDLING_DEFAULT = false
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
@@ -53,14 +54,23 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
+const errorHandler = (err, res) => {
+  err && res.status(400).send('An error occured')
+}
+
 dostroy = (config) => {
   const all = !config
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
-
-  return dostroy = (req, res, next) =>{
-    (rl || all) && rateLimiting(req, res, next, logging)
+  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
+  return function dostroy(err, req, res, next) {
+    if (eh || all) {
+      errorHandler(err, res)
+    }
+    if (rl || all) {
+      rateLimiting(req, res, next, logging)
+    }
     //TODO: Add slowloris
   }
 }
