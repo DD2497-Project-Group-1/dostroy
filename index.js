@@ -1,7 +1,7 @@
 const fs = require('fs')
 const moment = require('moment')
 
-const SLOWLORIS_DEFAULT = false // not yet implemented
+const RUDY_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 
@@ -49,23 +49,34 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
-const slowloris = (req, res, next, logging) => {
-  console.log(req.socket);
-  console.log(req.connection);
-  return false
-}
+const _bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
+
+const rudy = async (req, res, next, logging) =>
+  new Promise((resolve) => {
+    let start = moment()
+    req.on('data', () => {
+      const now = moment()
+      if (Math.abs(start.diff(now)) > _bodyChunkTimeout) {
+        return resolve(true)
+      }
+      start = now
+    })
+    req.on('end', () => {
+      return resolve(false)
+    })
+  })
 
 const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const dostroy = (config) => (req, res, next) => {
+const dostroy = (config) => async (req, res, next) => {
   const all = !config || Object.keys(config).length === 0
-  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+  const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
-
-  if ((rl || all) && rateLimiting(req, res, next, logging)) {
+  if (((rl || all) && rateLimiting(req, res, next, logging)) ||
+      ((r || all) && await rudy(req, res, next, logging))) {
     console.log('Dropped connection');
     return res.end()
   } else {
