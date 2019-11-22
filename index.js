@@ -6,7 +6,7 @@ const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 
 const logSession = new Date().toISOString()
-const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
+const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
 const _interval = 3000 // milliseconds to check number of requests
 const _limit = 3 // limit for requests within interval
@@ -36,7 +36,7 @@ const rateLimiting = (req, res, next, logging) => {
   let requests = addressObject.requests
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
-  if (diffSeconds < _interval && requests > _limit) {
+  if (diffSeconds < _interval && requests > _limit) {
     addAddressToRequests(address, requests + 1, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
     return true
@@ -59,26 +59,17 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const dostroy = (config) => {
+const dostroy = (config) => (req, res, next) => {
   const all = !config || Object.keys(config).length === 0
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
 
-  return (req, res, next) => {
-
-
-    //(sl || all) && slowloris(req, res, next, logging)
-
-    const dropConnection = (rl || all) && rateLimiting(req, res, next, logging)
-    if (((rl || all) && rateLimiting(req, res, next, logging)) ||
-        ((sl || all) && slowloris(req, res, next, logging))){
-      console.log('Dropped connection');
-      return res.end()
-    }else{
-      return next()
-    }
-    //TODO: Add slowloris
+  if ((rl || all) && rateLimiting(req, res, next, logging)) {
+    console.log('Dropped connection');
+    return res.end()
+  } else {
+    return next()
   }
 }
 
