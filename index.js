@@ -43,8 +43,9 @@ const rateLimiting = (req, res, next, logging) => {
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
   const limitDenominator = (totalActiveUsers > 0 ? totalActiveUsers : 1) //1 if there is no dynamic rate limiting
-  const requestLimit = _limit/limitDenominator //
+  const requestLimit = _limit/limitDenominator
   if (diffSeconds < _interval && requests > requestLimit) {
+    console.log(address + ' broke the limit of ' + requestLimit + ' connections')
     addAddressToRequests(address, requests + 1, now, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
     return true
@@ -59,14 +60,11 @@ const rateLimiting = (req, res, next, logging) => {
 
 const setTotalActiveUsers = (req) => {
   const address = req.connection.remoteAddress
-  const lastRequestAt = _rlAddressToRequests[address].lastRequestAt
-  console.log("Setting users:");
-  console.log("last req: " + lastActiveTimeout.diff(lastRequestAt));
-  
-  
-  if(!lastRequestAt || lastActiveTimeout.diff(lastRequestAt) < 0){ //The last connection was before we zeroed the totalActiveUsers field
+  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
+
+  if(!lastRequestAt || lastRequestAt.diff(lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
     totalActiveUsers++
-    console.log("Active users is now: " + totalActiveUsers);
+    console.log("Active users is now: " + totalActiveUsers)
   }
 }
 
@@ -104,7 +102,7 @@ const dostroy = (config) => async (req, res, next) => {
     setInterval(() => {
       totalActiveUsers = 0
       lastActiveTimeout = moment()
-    }, userActiveTimeout);
+    }, userActiveTimeout)
   }
 
   if ((rl || all) && dynamic) {
