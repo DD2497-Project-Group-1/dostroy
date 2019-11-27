@@ -64,7 +64,6 @@ const setTotalActiveUsers = (req) => {
 
   if(!lastRequestAt || lastRequestAt.diff(lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
     totalActiveUsers++
-    console.log("Active users is now: " + totalActiveUsers)
   }
 }
 
