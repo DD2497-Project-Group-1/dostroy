@@ -1,13 +1,13 @@
 const fs = require('fs')
 const moment = require('moment')
 
-const SLOWLORIS_DEFAULT = false // not yet implemented
+const RUDY_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
 
 const logSession = new Date().toISOString()
-const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', {flags:'a'})
+const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
 const _interval = 3000 // milliseconds to check number of requests
 const _limit = 3 // limit for requests within interval
@@ -31,48 +31,64 @@ const rateLimiting = (req, res, next, logging) => {
   const addressObject = _rlAddressToRequests[address]
   if (!addressObject) {
     addAddressToRequests(address, 1, now)
-    return next()
+    return false
   }
 
   let requests = addressObject.requests
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
-  if (diffSeconds < _interval && requests > _limit) {
+  if (diffSeconds < _interval && requests > _limit) {
     addAddressToRequests(address, requests + 1, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
-    return res.end()
+    return true
   } else if (diffSeconds < _interval) {
     addAddressToRequests(address, requests + 1, startRequestAt)
   } else {
     addAddressToRequests(address, 1, now)
   }
   logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ok')
-  return next()
+  return false
+}
+
+
+const rudy = async (req, res, next, logging) => {
+  const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
+  return new Promise((resolve) => {
+    let start = moment()
+    req.on('data', () => {
+      const now = moment()
+      if (Math.abs(start.diff(now)) > bodyChunkTimeout) {
+        resolve(true)
+      }
+      start = now
+    })
+    req.on('end', () => {
+      resolve(false)
+    })
+  })
 }
 
 const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const errorHandler = (err, res) => {
-  err && res.status(400).send('An error occured')
-}
-
-dostroy = (config) => {
-  const all = !config
-  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
+const dostroy = (config) => async (req, res, next) => {
+  const all = !config || Object.keys(config).length === 0
+  const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
-  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
-  return function dostroy(err, req, res, next) {
-    if (eh || all) {
-      errorHandler(err, res)
-    }
-    if (rl || all) {
-      rateLimiting(req, res, next, logging)
-    }
-    //TODO: Add slowloris
+  if (((rl || all) && rateLimiting(req, res, next, logging)) ||
+      ((r || all) && await rudy(req, res, next, logging))) {
+    console.log('Dropped connection')
+    return res.end()
+  } else {
+    return next()
   }
+}
+
+// TODO: Add errorhandler middleware in server
+const errorHandler = (err, res) => {
+  err && res.status(400).send('An error occured')
 }
 
 module.exports = dostroy
