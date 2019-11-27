@@ -4,6 +4,7 @@ const moment = require('moment')
 const RUDY_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
+const ERRORHANDLING_DEFAULT = false
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
@@ -83,6 +84,11 @@ const dostroy = (config) => async (req, res, next) => {
   } else {
     return next()
   }
+}
+
+// TODO: Add errorhandler middleware in server
+const errorHandler = (err, res) => {
+  err && res.status(400).send('An error occured')
 }
 
 module.exports = dostroy
