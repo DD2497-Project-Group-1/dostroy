@@ -49,22 +49,23 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
-const _bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
 
-const rudy = async (req, res, next, logging) =>
-  new Promise((resolve) => {
+const rudy = async (req, res, next, logging) => {
+  const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
+  return new Promise((resolve) => {
     let start = moment()
     req.on('data', () => {
       const now = moment()
-      if (Math.abs(start.diff(now)) > _bodyChunkTimeout) {
-        return resolve(true)
+      if (Math.abs(start.diff(now)) > bodyChunkTimeout) {
+        resolve(true)
       }
       start = now
     })
     req.on('end', () => {
-      return resolve(false)
+      resolve(false)
     })
   })
+}
 
 const getAddresses = () => {
   return _rlAddressToRequests
@@ -77,7 +78,7 @@ const dostroy = (config) => async (req, res, next) => {
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
-    console.log('Dropped connection');
+    console.log('Dropped connection')
     return res.end()
   } else {
     return next()
