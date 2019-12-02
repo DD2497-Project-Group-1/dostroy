@@ -6,20 +6,25 @@ const SLOWLORIS_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
+const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
+const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
-const _interval = 3000 // milliseconds to check number of requests
-const _limit = 3 // limit for requests within interval
+const _interval = 10000 // milliseconds to check number of requests
+const _limit = 10 // limit for requests within interval
+let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
+let _lastActiveTimeout = moment()
+
 let _rlAddressToRequests = {}
 
 const formatMoment = (moment) => {
   return moment.format()
 }
 
-const addAddressToRequests = (address, requests, startRequestAt) => {
-  _rlAddressToRequests[address] = { requests, startRequestAt }
+const addAddressToRequests = (address, requests, startRequestAt, lastRequestAt) => {
+  _rlAddressToRequests[address] = { requests, startRequestAt, lastRequestAt}
 }
 
 const logRateLimiting = (moment, address, interval, requests, status) => {
@@ -31,25 +36,28 @@ const rateLimiting = (req, res, next, logging) => {
   const now = moment()
   const addressObject = _rlAddressToRequests[address]
   if (!addressObject) {
-    addAddressToRequests(address, 1, now)
+    addAddressToRequests(address, 1, now, now)
     return false
   }
 
   let requests = addressObject.requests
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
-  if (diffSeconds < _interval && requests > _limit) {
-    addAddressToRequests(address, requests + 1, now)
+  const limitDenominator = (_totalActiveUsers > 0 ? _totalActiveUsers : 1) //1 if there is no dynamic rate limiting
+  const requestLimit = _limit/limitDenominator
+  if (diffSeconds < _interval && requests > requestLimit) {
+    addAddressToRequests(address, requests + 1, now, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
     return true
   } else if (diffSeconds < _interval) {
-    addAddressToRequests(address, requests + 1, startRequestAt)
+    addAddressToRequests(address, requests + 1, startRequestAt, now)
   } else {
-    addAddressToRequests(address, 1, now)
+    addAddressToRequests(address, 1, now, now)
   }
   logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ok')
   return false
 }
+
 
 const rudy = async (req, res, next, logging) => {
   const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
@@ -76,16 +84,40 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
+const setTotalActiveUsers = (req) => {
+  const address = req.connection.remoteAddress
+  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
+
+  if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
+    _totalActiveUsers++
+  }
+}
+
 const dostroy = (HTTPServer, config) => async (req, res, next) => {
   if (!HTTPServer) throw new Error('Server has not been initialized')
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
+  const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
+  const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
+  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
 
   // Parsing request
   if (sl || all) slowloris(HTTPServer)
+
+  if(dynamic){
+    setInterval(() => {
+      _totalActiveUsers = 0
+      _lastActiveTimeout = moment()
+    }, userActiveTimeout)
+  }
+  
+  if ((rl || all) && dynamic) {
+    setTotalActiveUsers(req)
+  }
+  
   // Analysing request
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
