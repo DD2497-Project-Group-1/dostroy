@@ -89,6 +89,7 @@ const getAddresses = () => {
 }
 
 const dostroy = (config) => async (req, res, next) => {
+  const now = moment()
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
@@ -98,12 +99,10 @@ const dostroy = (config) => async (req, res, next) => {
   const interval = dynamic && config && !isNaN(config.requestInterval) ? config.requestInterval : INTERVAL_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
-  
-  if(dynamic){
-    setInterval(() => {
-      _totalActiveUsers = 0
-      _lastActiveTimeout = moment()
-    }, userActiveTimeout)
+
+  if(dynamic && now.diff(_lastActiveTimeout) > userActiveTimeout){
+    _totalActiveUsers = 0
+    _lastActiveTimeout = moment()
   }
 
   if ((rl || all) && dynamic) {
