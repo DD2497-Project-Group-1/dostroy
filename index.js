@@ -2,6 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
+const SLOWLORIS_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
@@ -57,14 +58,6 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
-const setTotalActiveUsers = (req) => {
-  const address = req.connection.remoteAddress
-  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
-
-  if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
-    _totalActiveUsers++
-  }
-}
 
 const rudy = async (req, res, next, logging) => {
   const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
@@ -83,30 +76,49 @@ const rudy = async (req, res, next, logging) => {
   })
 }
 
+const slowloris = (HTTPServer) => {
+  HTTPServer.headersTimeout = 1000
+}
+
 const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const dostroy = (config) => async (req, res, next) => {
+const setTotalActiveUsers = (req) => {
+  const address = req.connection.remoteAddress
+  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
+
+  if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
+    _totalActiveUsers++
+  }
+}
+
+const dostroy = (HTTPServer, config) => async (req, res, next) => {
+  if (!HTTPServer) throw new Error('Server has not been initialized')
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
+  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
-  
+
+  // Parsing request
+  if (sl || all) slowloris(HTTPServer)
+
   if(dynamic){
     setInterval(() => {
       _totalActiveUsers = 0
       _lastActiveTimeout = moment()
     }, userActiveTimeout)
   }
-
+  
   if ((rl || all) && dynamic) {
-      setTotalActiveUsers(req)
+    setTotalActiveUsers(req)
   }
-
+  
+  // Analysing request
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
     console.log('Dropped connection')
