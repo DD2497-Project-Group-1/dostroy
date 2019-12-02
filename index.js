@@ -7,12 +7,13 @@ const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
 const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
 const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
+const INTERVAL_DEFAULT = 10000
+const LIMT_DEFAULT = 10
+
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
-const _interval = 10000 // milliseconds to check number of requests
-const _limit = 10 // limit for requests within interval
 let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
 let _lastActiveTimeout = moment()
 
@@ -30,7 +31,7 @@ const logRateLimiting = (moment, address, interval, requests, status) => {
   logStream.write('[' + formatMoment(moment) + ']{ Address: ' + address + ', interval: ' + interval + 'ms, requests: ' + requests + ', status: ' + status + ' }\n')
 }
 
-const rateLimiting = (req, res, next, logging) => {
+const rateLimiting = (req, res, next, logging, limit, interval) => {
   const address = req.connection.remoteAddress
   const now = moment()
   const addressObject = _rlAddressToRequests[address]
@@ -43,17 +44,17 @@ const rateLimiting = (req, res, next, logging) => {
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
   const limitDenominator = (_totalActiveUsers > 0 ? _totalActiveUsers : 1) //1 if there is no dynamic rate limiting
-  const requestLimit = _limit/limitDenominator
-  if (diffSeconds < _interval && requests > requestLimit) {
+  const requestLimit = limit/limitDenominator
+  if (diffSeconds < interval && requests > requestLimit) {
     addAddressToRequests(address, requests + 1, now, now)
-    logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
+    logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, interval, _rlAddressToRequests[address].requests, 'ended')
     return true
-  } else if (diffSeconds < _interval) {
+  } else if (diffSeconds < interval) {
     addAddressToRequests(address, requests + 1, startRequestAt, now)
   } else {
     addAddressToRequests(address, 1, now, now)
   }
-  logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ok')
+  logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, interval, _rlAddressToRequests[address].requests, 'ok')
   return false
 }
 
@@ -93,6 +94,8 @@ const dostroy = (config) => async (req, res, next) => {
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
+  const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMT_DEFAULT
+  const interval = dynamic && config && !isNaN(config.requestInterval) ? config.requestInterval : INTERVAL_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
   
@@ -107,9 +110,8 @@ const dostroy = (config) => async (req, res, next) => {
       setTotalActiveUsers(req)
   }
 
-  if (((rl || all) && rateLimiting(req, res, next, logging)) ||
+  if (((rl || all) && rateLimiting(req, res, next, logging, limit, interval)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
-    console.log('Dropped connection')
     return res.end()
   } else {
     return next()
