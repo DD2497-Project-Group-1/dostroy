@@ -8,7 +8,7 @@ const ERRORHANDLING_DEFAULT = false
 const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
 const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
-const LIMT_DEFAULT = 10
+const LIMIT_DEFAULT = 10
 
 
 const logSession = new Date().toISOString()
@@ -95,7 +95,7 @@ const dostroy = (config) => async (req, res, next) => {
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
-  const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMT_DEFAULT
+  const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMIT_DEFAULT
   const interval = dynamic && config && !isNaN(config.requestInterval) ? config.requestInterval : INTERVAL_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
