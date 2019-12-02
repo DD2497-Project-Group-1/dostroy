@@ -13,8 +13,8 @@ const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '
 
 const _interval = 10000 // milliseconds to check number of requests
 const _limit = 10 // limit for requests within interval
-let totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
-let lastActiveTimeout = moment()
+let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
+let _lastActiveTimeout = moment()
 
 let _rlAddressToRequests = {}
 
@@ -42,10 +42,9 @@ const rateLimiting = (req, res, next, logging) => {
   let requests = addressObject.requests
   const startRequestAt = addressObject.startRequestAt
   const diffSeconds = now.diff(startRequestAt)
-  const limitDenominator = (totalActiveUsers > 0 ? totalActiveUsers : 1) //1 if there is no dynamic rate limiting
+  const limitDenominator = (_totalActiveUsers > 0 ? _totalActiveUsers : 1) //1 if there is no dynamic rate limiting
   const requestLimit = _limit/limitDenominator
   if (diffSeconds < _interval && requests > requestLimit) {
-    console.log(address + ' broke the limit of ' + requestLimit + ' connections')
     addAddressToRequests(address, requests + 1, now, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, _interval, _rlAddressToRequests[address].requests, 'ended')
     return true
@@ -62,8 +61,8 @@ const setTotalActiveUsers = (req) => {
   const address = req.connection.remoteAddress
   const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
 
-  if(!lastRequestAt || lastRequestAt.diff(lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
-    totalActiveUsers++
+  if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
+    _totalActiveUsers++
   }
 }
 
@@ -92,15 +91,15 @@ const dostroy = (config) => async (req, res, next) => {
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
-  const dynamic = config && config.rateLimiting ? config.rateLimiting.useDynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
-  const userActiveTimeout = dynamic && config.rateLimiting.userActiveTimeout ? config.rateLimiting.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
+  const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
+  const userActiveTimeout = dynamic && config.userActiveTimeout && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
-
+  
   if(dynamic){
     setInterval(() => {
-      totalActiveUsers = 0
-      lastActiveTimeout = moment()
+      _totalActiveUsers = 0
+      _lastActiveTimeout = moment()
     }, userActiveTimeout)
   }
 
