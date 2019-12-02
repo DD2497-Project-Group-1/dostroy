@@ -50,20 +50,22 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
+const _createTimeout = (resolve) => {
+  return setTimeout(() => {
+    return resolve(true)
+  }, 1000)
+}
 
 const rudy = async (req, res, next, logging) => {
-  const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
   return new Promise((resolve) => {
-    let start = moment()
+    let timeout = _createTimeout(resolve)
     req.on('data', () => {
-      const now = moment()
-      if (Math.abs(start.diff(now)) > bodyChunkTimeout) {
-        resolve(true)
-      }
-      start = now
+      clearTimeout(timeout)
+      timeout = _createTimeout(resolve)
     })
     req.on('end', () => {
-      resolve(false)
+      clearTimeout(timeout)
+      return resolve(false)
     })
   })
 }
