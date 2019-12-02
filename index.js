@@ -82,6 +82,7 @@ const dostroy = (config) => async (req, res, next) => {
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
     console.log('Dropped connection')
+    res.connection.destroy()
     return res.end()
   } else {
     return next()
