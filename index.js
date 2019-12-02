@@ -2,6 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
+const SLOWLORIS_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
@@ -50,7 +51,6 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
-
 const rudy = async (req, res, next, logging) => {
   const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
   return new Promise((resolve) => {
@@ -68,15 +68,25 @@ const rudy = async (req, res, next, logging) => {
   })
 }
 
+const slowloris = (HTTPServer) => {
+  HTTPServer.headersTimeout = 1000
+}
+
 const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const dostroy = (config) => async (req, res, next) => {
+const dostroy = (HTTPServer, config) => async (req, res, next) => {
+  if (!HTTPServer) throw new Error('Server has not been initialized')
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
+  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
+
+  // Parsing request
+  if (sl || all) slowloris(HTTPServer)
+  // Analysing request
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
       ((r || all) && await rudy(req, res, next, logging))) {
     console.log('Dropped connection')
