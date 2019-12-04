@@ -104,13 +104,14 @@ const setTotalActiveUsers = (req) => {
 
 const init = (HTTPServer, serverConfig) => {
   if (!HTTPServer) throw new Error('Server has not been initialized')
-  if (!serverConfig) throw new Error('No config from server')
+  if (!serverConfig) throw new Error('No config for server')
 
   let config = {}
   config.all = !serverConfig || Object.keys(serverConfig).length === 0
   config.r = serverConfig && serverConfig.rudy ? serverConfig.rudy : RUDY_DEFAULT
   config.sl = serverConfig && serverConfig.slowloris ? serverConfig.slowloris : SLOWLORIS_DEFAULT
   config.rl = serverConfig && serverConfig.rateLimiting ? serverConfig.rateLimiting : RATELIMITING_DEFAULT
+  config.rtimeout = serverConfig && serverConfig.rudyTimeout ? serverConfig.rudyTimeout : RUDY_TIMEOUT_DEFAULT
   config.dynamic = serverConfig && serverConfig.dynamicRateLimiting ? serverConfig.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   config.userActiveTimeout = config.dynamic && serverConfig && !isNaN(serverConfig.userActiveTimeout) ? serverConfig.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   config.limit = config.dynamic && serverConfig && !isNaN(serverConfig.requestLimit) ? serverConfig.requestLimit : LIMIT_DEFAULT
@@ -125,7 +126,7 @@ const init = (HTTPServer, serverConfig) => {
 }
 
 const protect = (config) => async (req, res, next) => {
-  if (!config) throw new Error('No config from server')
+  if (!config) throw new Error('No config for server')
 
   const now = moment()
 
@@ -139,7 +140,7 @@ const protect = (config) => async (req, res, next) => {
   }
 
   if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval)) ||
-      ((config.r || config.all) && await rudy(req, res, next, config.logging))) {
+      ((config.r || config.all) && await rudy(req, config.rtimeout, config.logging))) {
     return res.end()
   } else {
     return next()
