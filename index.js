@@ -104,7 +104,7 @@ const dostroy = (HTTPServer, config) => async (req, res, next) => {
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
 
-  const headerTimeout = config && config.headerTimeout ? config.headerTimeout : HEADERTIMEOUT_DEFAULT
+  const headerTimeout = config && config.headerTimeout ? config.headerTimeout : HEADER_TIMEOUT_DEFAULT
   const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMIT_DEFAULT
