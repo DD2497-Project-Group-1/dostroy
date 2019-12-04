@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/DD2497-Project-Group-1/dostroy#readme",
   "dependencies": {
+    "crypto": "^1.0.1",
     "moment": "^2.24.0"
   }
 }

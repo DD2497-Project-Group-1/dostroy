@@ -1,5 +1,6 @@
 const fs = require('fs')
 const moment = require('moment')
+const crypto = require('crypto')
 
 const RUDY_DEFAULT = false
 const RUDY_TIMEOUT_DEFAULT = 100
@@ -35,7 +36,7 @@ const logRateLimiting = (moment, address, interval, requests, status) => {
 }
 
 const rateLimiting = (req, res, next, logging, limit, interval) => {
-  const address = req.connection.remoteAddress
+  const address = crypto.createHash('sha1').update(req.connection.remoteAddress).digest('hex');
   const now = moment()
   const addressObject = _rlAddressToRequests[address]
   if (!addressObject) {
