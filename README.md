@@ -12,7 +12,7 @@ Install package:
 ```
 npm install dostroy
 ```
-Example usage to limit number of requests from a remote address to a Node.js server:
+Example usage to handle malicious requests from remote addresses to a Node.js server:
 ```
 config = {
   rateLimiting: true,
@@ -26,6 +26,11 @@ config = {
 const server = app.listen(3000)
 const dostroyConfig = dostroy.init(server, config)
 app.use(dostroy.protect(dostroyConfig))
+
+... end of server ...
+
+app.use(dostroy.errorHandler)
+
 ```
 ## Config
 dostroy allows for some degree of configuration. The individual mitigations can be turned on or off and have their thresholds set. If no config is passed, dostroy will employ all mitigations with standard values.
@@ -40,7 +45,8 @@ config = {
   requestLimit: int,
   requestInterval: int, 
   logging: boolean,
-  headerTimeout: int
+  headerTimeout: int,
+  errorHandling: boolean
 }
 ```
 ##### slowloris
@@ -76,6 +82,9 @@ Should logging be enabled?
 ##### headerTimeout
 The timeout in milliseconds when transmitting the header. If the timeout is exceeded the connection is dropped.
 *Default:* 1000
+##### errorHandling
+Whether dostroy should prevent server from crashing on unexpected errors.
+*Default:* false
 
 ## The Mitigations
 dostroy employs several techniques to mitigate different attacks. Here are the attacks dostroy aims to mitigate.
