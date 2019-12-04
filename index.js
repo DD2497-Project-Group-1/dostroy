@@ -2,7 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
-const RUDY_TIMEOUT_DEFAULT = 1000
+const RUDY_TIMEOUT_DEFAULT = 100
 const SLOWLORIS_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
