@@ -14,22 +14,18 @@ npm install dostroy
 ```
 Example usage to limit number of requests from a remote address to a Node.js server:
 ```
-const dostroy = require('dostroy')
-const express = require('express')
-const app = express()
-
-const config = {
-  slowloris: true,
+config = {
   rateLimiting: true,
-  rudy: false
+  dynamicRateLimiting: true,
+  userActiveTimeout: 10000,
+  requestLimit: 10,
+  requestInterval: 10000,
+  rudy: true
 }
 
 const server = app.listen(3000)
-app.use(dostroy(server, config))
-
-app.get('/', function (req, res) {
-  res.send('Hello from example server')
-})
+const dostroyConfig = dostroy.init(server, config)
+app.use(dostroy.protect(dostroyConfig))
 ```
 ## Config
 Dostroy allows for some degree of configuration. The individual mitigations can be turned on or off and have their thresholds set. If no config is passed, Dostroy will employ all mitigations with standard values.
