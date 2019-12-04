@@ -2,7 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
-const RUDY_TIMEOUT_DEFAULT = 10000
+const RUDY_TIMEOUT_DEFAULT = 1000
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
@@ -84,11 +84,11 @@ const getAddresses = () => {
 const dostroy = (config) => async (req, res, next) => {
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
-  const rtime = config && config.rudyTimeout ? config.rudyTimeout : RUDY_TIMEOUT_DEFAULT
+  const rtimeout = config && config.rudyTimeout ? config.rudyTimeout : RUDY_TIMEOUT_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
-      ((r || all) && await rudy(req, rtime, logging))) {
+    ((r || all) && await rudy(req, rtimeout, logging))) {
     console.log('Dropped connection')
     res.connection.destroy()
     return res.end()
