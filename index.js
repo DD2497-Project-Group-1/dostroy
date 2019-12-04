@@ -2,6 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
+const RUDY_TIMEOUT_DEFAULT = 1000
 const SLOWLORIS_DEFAULT = false
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
@@ -10,6 +11,7 @@ const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
 const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
 const LIMIT_DEFAULT = 10
+const HEADER_TIMEOUT_DEFAULT = 1000
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
@@ -57,26 +59,34 @@ const rateLimiting = (req, res, next, logging, limit, interval) => {
   return false
 }
 
+const _createTimeout = (resolve, timeoutTime) => {
+  return setTimeout(() => {
+    return resolve(true)
+  }, timeoutTime)
+}
 
-const rudy = async (req, res, next, logging) => {
-  const bodyChunkTimeout = 100 // 100ms upper limit for each body chunk
+const logRudy = (moment, address, timeoutTime, status) => {
+  logStream.write('[' + formatMoment(moment) + ']{ Address: ' + address + ', timeout limit: ' + timeoutTime + 'ms, status: ' + status + ' }\n')
+}
+
+const rudy = async (req, timeoutTime, logging) => {
   return new Promise((resolve) => {
-    let start = moment()
+    let timeout = _createTimeout(resolve, timeoutTime)
     req.on('data', () => {
-      const now = moment()
-      if (Math.abs(start.diff(now)) > bodyChunkTimeout) {
-        resolve(true)
-      }
-      start = now
+      clearTimeout(timeout)
+      logging && logRudy(moment(), req.ip, timeoutTime, 'ended')
+      timeout = _createTimeout(resolve, timeoutTime)
     })
     req.on('end', () => {
-      resolve(false)
+      clearTimeout(timeout)
+      logging && logRudy(moment(), req.ip, timeoutTime, 'ok')
+      return resolve(false)
     })
   })
 }
 
-const initSlowloris = (HTTPServer) => {
-  HTTPServer.headersTimeout = 1000
+const slowloris = (HTTPServer, headerTimeout) => {
+  HTTPServer.headersTimeout = headerTimeout
 }
 
 const getAddresses = () => {
