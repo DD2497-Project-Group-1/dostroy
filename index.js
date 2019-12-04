@@ -57,15 +57,21 @@ const _createTimeout = (resolve, timeoutTime) => {
   }, timeoutTime)
 }
 
+const logRudy = (moment, address, timeoutTime, status) => {
+  logStream.write('[' + formatMoment(moment) + ']{ Address: ' + address + ', timeout limit: ' + timeoutTime + 'ms, status: ' + status + ' }\n')
+}
+
 const rudy = async (req, timeoutTime, logging) => {
   return new Promise((resolve) => {
     let timeout = _createTimeout(resolve, timeoutTime)
     req.on('data', () => {
       clearTimeout(timeout)
+      logging && logRudy(moment(), req.ip, timeoutTime, 'ended')
       timeout = _createTimeout(resolve, timeoutTime)
     })
     req.on('end', () => {
       clearTimeout(timeout)
+      logging && logRudy(moment(), req.ip, timeoutTime, 'ok')
       return resolve(false)
     })
   })
