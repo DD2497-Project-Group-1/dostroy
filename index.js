@@ -2,6 +2,7 @@ const fs = require('fs')
 const moment = require('moment')
 
 const RUDY_DEFAULT = false
+const RUDY_TIMEOUT_DEFAULT = 10000
 const RATELIMITING_DEFAULT = false
 const LOGGING_DEFAULT = false
 const ERRORHANDLING_DEFAULT = false
@@ -50,18 +51,18 @@ const rateLimiting = (req, res, next, logging) => {
   return false
 }
 
-const _createTimeout = (resolve) => {
+const _createTimeout = (resolve, timeoutTime) => {
   return setTimeout(() => {
     return resolve(true)
-  }, 1000)
+  }, timeoutTime)
 }
 
-const rudy = async (req, res, next, logging) => {
+const rudy = async (req, timeoutTime, logging) => {
   return new Promise((resolve) => {
-    let timeout = _createTimeout(resolve)
+    let timeout = _createTimeout(resolve, timeoutTime)
     req.on('data', () => {
       clearTimeout(timeout)
-      timeout = _createTimeout(resolve)
+      timeout = _createTimeout(resolve, timeoutTime)
     })
     req.on('end', () => {
       clearTimeout(timeout)
@@ -77,10 +78,11 @@ const getAddresses = () => {
 const dostroy = (config) => async (req, res, next) => {
   const all = !config || Object.keys(config).length === 0
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
+  const rtime = config && config.rudyTimeout ? config.rudyTimeout : RUDY_TIMEOUT_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
   if (((rl || all) && rateLimiting(req, res, next, logging)) ||
-      ((r || all) && await rudy(req, res, next, logging))) {
+      ((r || all) && await rudy(req, rtime, logging))) {
     console.log('Dropped connection')
     res.connection.destroy()
     return res.end()
