@@ -10,6 +10,7 @@ const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
 const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
 const LIMIT_DEFAULT = 10
+const HEADERTIMEOUT_DEFAULT = 1000
 
 
 const logSession = new Date().toISOString()
@@ -77,8 +78,8 @@ const rudy = async (req, res, next, logging) => {
   })
 }
 
-const slowloris = (HTTPServer) => {
-  HTTPServer.headersTimeout = 1000
+const slowloris = (HTTPServer, headerTimeout) => {
+  HTTPServer.headersTimeout = headerTimeout
 }
 
 const getAddresses = () => {
@@ -101,15 +102,17 @@ const dostroy = (HTTPServer, config) => async (req, res, next) => {
   const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
   const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
   const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
+  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
+
+  const headerTimeout = config && config.headerTimeout ? config.headerTimeout : HEADERTIMEOUT_DEFAULT
   const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMIT_DEFAULT
   const interval = dynamic && config && !isNaN(config.requestInterval) ? config.requestInterval : INTERVAL_DEFAULT
   const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
-  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
 
   // Parsing request
-  if (sl || all) slowloris(HTTPServer)
+  if (sl || all) slowloris(HTTPServer, headerTimeout)
 
   if(dynamic && now.diff(_lastActiveTimeout) > userActiveTimeout){
     _totalActiveUsers = 0
