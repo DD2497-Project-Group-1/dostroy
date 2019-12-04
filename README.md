@@ -14,6 +14,10 @@ npm install dostroy
 ```
 Example usage to handle malicious requests from remote addresses to a Node.js server:
 ```
+const express = require('express')
+const dostroy = require('dostroy')
+const app = express()
+
 config = {
   rateLimiting: true,
   dynamicRateLimiting: true,
