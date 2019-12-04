@@ -150,11 +150,11 @@ const protect = (config) => async (req, res, next) => {
   }
 }
 
-// TODO: Add errorhandler middleware in server
-const errorHandler = (err, res) => {
+const errorHandler = (err, _, res, __) => {
   err && res.status(400).send('An error occured')
 }
 
 module.exports.init = init
 module.exports.protect = protect
+module.exports.errorHandler = errorHandler
 module.exports.getAddresses = getAddresses
