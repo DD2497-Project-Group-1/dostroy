@@ -111,16 +111,18 @@ const init = (HTTPServer, serverConfig) => {
   config.r = serverConfig && serverConfig.rudy ? serverConfig.rudy : RUDY_DEFAULT
   config.sl = serverConfig && serverConfig.slowloris ? serverConfig.slowloris : SLOWLORIS_DEFAULT
   config.rl = serverConfig && serverConfig.rateLimiting ? serverConfig.rateLimiting : RATELIMITING_DEFAULT
+  config.eh = serverConfig && serverConfig.errorHandling ? serverConfig.errorHandling : ERRORHANDLING_DEFAULT
+
   config.rtimeout = serverConfig && serverConfig.rudyTimeout ? serverConfig.rudyTimeout : RUDY_TIMEOUT_DEFAULT
   config.dynamic = serverConfig && serverConfig.dynamicRateLimiting ? serverConfig.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   config.userActiveTimeout = config.dynamic && serverConfig && !isNaN(serverConfig.userActiveTimeout) ? serverConfig.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   config.limit = config.dynamic && serverConfig && !isNaN(serverConfig.requestLimit) ? serverConfig.requestLimit : LIMIT_DEFAULT
   config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
-  config.eh = serverConfig && serverConfig.errorHandling ? serverConfig.errorHandling : ERRORHANDLING_DEFAULT
+  config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
 
   if (config.sl || config.all) {
-    initSlowloris(HTTPServer)
+    initSlowloris(HTTPServer, config.headerTimeout)
   }
   return config
 }
