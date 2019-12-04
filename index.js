@@ -11,13 +11,11 @@ const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
 const LIMIT_DEFAULT = 10
 
-
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
 let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
 let _lastActiveTimeout = moment()
-
 let _rlAddressToRequests = {}
 
 const formatMoment = (moment) => {
@@ -77,7 +75,7 @@ const rudy = async (req, res, next, logging) => {
   })
 }
 
-const slowloris = (HTTPServer) => {
+const initSlowloris = (HTTPServer) => {
   HTTPServer.headersTimeout = 1000
 }
 
@@ -94,34 +92,44 @@ const setTotalActiveUsers = (req) => {
   }
 }
 
-const dostroy = (HTTPServer, config) => async (req, res, next) => {
+const init = (HTTPServer, serverConfig) => {
   if (!HTTPServer) throw new Error('Server has not been initialized')
+  if (!serverConfig) throw new Error('No config from server')
+
+  let config = {}
+  config.all = !serverConfig || Object.keys(serverConfig).length === 0
+  config.r = serverConfig && serverConfig.rudy ? serverConfig.rudy : RUDY_DEFAULT
+  config.sl = serverConfig && serverConfig.slowloris ? serverConfig.slowloris : SLOWLORIS_DEFAULT
+  config.rl = serverConfig && serverConfig.rateLimiting ? serverConfig.rateLimiting : RATELIMITING_DEFAULT
+  config.dynamic = serverConfig && serverConfig.dynamicRateLimiting ? serverConfig.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
+  config.userActiveTimeout = config.dynamic && serverConfig && !isNaN(serverConfig.userActiveTimeout) ? serverConfig.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
+  config.limit = config.dynamic && serverConfig && !isNaN(serverConfig.requestLimit) ? serverConfig.requestLimit : LIMIT_DEFAULT
+  config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
+  config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
+  config.eh = serverConfig && serverConfig.errorHandling ? serverConfig.errorHandling : ERRORHANDLING_DEFAULT
+
+  if (config.sl || config.all) {
+    initSlowloris(HTTPServer)
+  }
+  return config
+}
+
+const protect = (config) => async (req, res, next) => {
+  if (!config) throw new Error('No config from server')
+
   const now = moment()
-  const all = !config || Object.keys(config).length === 0
-  const r = config && config.rudy ? config.rudy : RUDY_DEFAULT
-  const sl = config && config.slowloris ? config.slowloris : SLOWLORIS_DEFAULT
-  const rl = config && config.rateLimiting ? config.rateLimiting : RATELIMITING_DEFAULT
-  const dynamic = config && config.dynamicRateLimiting ? config.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
-  const userActiveTimeout = dynamic && config && !isNaN(config.userActiveTimeout) ? config.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
-  const limit = dynamic && config && !isNaN(config.requestLimit) ? config.requestLimit : LIMIT_DEFAULT
-  const interval = dynamic && config && !isNaN(config.requestInterval) ? config.requestInterval : INTERVAL_DEFAULT
-  const logging = config && config.logging ? config.logging : LOGGING_DEFAULT
-  const eh = config && config.errorHandling ? config.errorHandling : ERRORHANDLING_DEFAULT
 
-  // Parsing request
-  if (sl || all) slowloris(HTTPServer)
-
-  if(dynamic && now.diff(_lastActiveTimeout) > userActiveTimeout){
+  if(config.dynamic && now.diff(_lastActiveTimeout) > config.userActiveTimeout){
     _totalActiveUsers = 0
     _lastActiveTimeout = moment()
   }
 
-  if ((rl || all) && dynamic) {
+  if ((config.rl || config.all) && config.dynamic) {
     setTotalActiveUsers(req)
   }
 
-  if (((rl || all) && rateLimiting(req, res, next, logging, limit, interval)) ||
-      ((r || all) && await rudy(req, res, next, logging))) {
+  if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval)) ||
+      ((config.r || config.all) && await rudy(req, res, next, config.logging))) {
     return res.end()
   } else {
     return next()
@@ -133,5 +141,6 @@ const errorHandler = (err, res) => {
   err && res.status(400).send('An error occured')
 }
 
-module.exports = dostroy
+module.exports.init = init
+module.exports.protect = protect
 module.exports.getAddresses = getAddresses
