@@ -11,7 +11,7 @@ const ERRORHANDLING_DEFAULT = false
 const USE_DYNAMIC_RATE_LIMITING_DEFAULT = false
 const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
-const LIMIT_DEFAULT = 100
+const LIMIT_DEFAULT = 5
 const HEADER_TIMEOUT_DEFAULT = 1000
 
 const logSession = new Date().toISOString()
@@ -113,7 +113,6 @@ const init = (HTTPServer, serverConfig) => {
   config.sl = serverConfig && serverConfig.slowloris ? serverConfig.slowloris : SLOWLORIS_DEFAULT
   config.rl = serverConfig && serverConfig.rateLimiting ? serverConfig.rateLimiting : RATELIMITING_DEFAULT
   config.eh = serverConfig && serverConfig.errorHandling ? serverConfig.errorHandling : ERRORHANDLING_DEFAULT
-
   config.rtimeout = serverConfig && serverConfig.rudyTimeout ? serverConfig.rudyTimeout : RUDY_TIMEOUT_DEFAULT
   config.dynamic = serverConfig && serverConfig.dynamicRateLimiting ? serverConfig.dynamicRateLimiting : USE_DYNAMIC_RATE_LIMITING_DEFAULT
   config.userActiveTimeout = config.dynamic && serverConfig && !isNaN(serverConfig.userActiveTimeout) ? serverConfig.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
@@ -121,29 +120,30 @@ const init = (HTTPServer, serverConfig) => {
   config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
   config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
-
+  
   if (config.sl || config.all) {
-    initSlowloris(HTTPServer, config.headerTimeout)
+    slowloris(HTTPServer, config.headerTimeout)
   }
   return config
 }
 
 const protect = (config) => async (req, res, next) => {
   if (!config) throw new Error('No config for server')
-
+  
   const now = moment()
-
+  
   if(config.dynamic && now.diff(_lastActiveTimeout) > config.userActiveTimeout){
     _totalActiveUsers = 0
     _lastActiveTimeout = moment()
   }
-
+  
   if ((config.rl || config.all) && config.dynamic) {
     setTotalActiveUsers(req)
   }
-
+  
   if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval)) ||
       ((config.r || config.all) && await rudy(req, config.rtimeout, config.logging))) {
+    res.connection.destroy()
     return res.end()
   } else {
     return next()
