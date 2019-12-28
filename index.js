@@ -95,9 +95,8 @@ const getAddresses = () => {
 }
 
 const setTotalActiveUsers = (req) => {
-  const address = req.connection.remoteAddress
+  const address = Crypto.SHA256(req.connection.remoteAddress).toString(Crypto.enc.Hex);
   const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
-
   if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
     _totalActiveUsers++
   }
@@ -120,7 +119,9 @@ const init = (HTTPServer, serverConfig) => {
   config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
   config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
-  
+
+
+
   if (config.sl || config.all) {
     slowloris(HTTPServer, config.headerTimeout)
   }
@@ -129,18 +130,18 @@ const init = (HTTPServer, serverConfig) => {
 
 const protect = (config) => async (req, res, next) => {
   if (!config) throw new Error('No config for server')
-  
+
   const now = moment()
-  
+
   if(config.dynamic && now.diff(_lastActiveTimeout) > config.userActiveTimeout){
     _totalActiveUsers = 0
     _lastActiveTimeout = moment()
   }
-  
+
   if ((config.rl || config.all) && config.dynamic) {
     setTotalActiveUsers(req)
   }
-  
+
   if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval)) ||
       ((config.r || config.all) && await rudy(req, config.rtimeout, config.logging))) {
     res.connection.destroy()
