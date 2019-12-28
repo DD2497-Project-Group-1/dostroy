@@ -21,6 +21,12 @@ let _totalActiveUsers = 0 // The amount of active users reset every now and then
 let _lastActiveTimeout = moment()
 let _rlAddressToRequests = {}
 
+const generateSalt = () => Math.random().toString(16).substring(2, 5) + Math.random().toString(16).substring(2, 5)
+
+const setHourlySalt = () => _hourlySalt = generateSalt()
+
+const getHourlySalt = () => _hourlySalt
+
 const formatMoment = (moment) => {
   return moment.format()
 }
@@ -120,7 +126,8 @@ const init = (HTTPServer, serverConfig) => {
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
   config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
 
-
+  setHourlySalt()
+  setInterval(() => setHourlySalt(), 1000 * 3600)
 
   if (config.sl || config.all) {
     slowloris(HTTPServer, config.headerTimeout)
