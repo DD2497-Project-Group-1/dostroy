@@ -171,7 +171,7 @@ const protect = (config) => async (req, res, next) => {
   if(config.rl && now.diff(_lastUserTableClear) > config.userTableClearTimeout){
     _rlAddressToRequests = {}
     _userQueue = []
-    _lastActiveTimeout = moment()
+    _lastUserTableClear = moment()
   }
   
   if ((config.rl || config.all) && config.dynamic) {
