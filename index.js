@@ -13,13 +13,17 @@ const USER_ACTIVE_TIMEOUT_DEFAULT = 30000
 const INTERVAL_DEFAULT = 10000
 const LIMIT_DEFAULT = 5
 const HEADER_TIMEOUT_DEFAULT = 1000
+const USER_TABLE_MAX_SIZE_DEFAULT = 1000
+const USER_TABLE_CLEAR_TIMEOUT = 1000*60*60 //Clear table every hour
 
 const logSession = new Date().toISOString()
 const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '.log', { flags: 'a' })
 
 let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
 let _lastActiveTimeout = moment()
+let _lastUserTableClear = moment()
 let _rlAddressToRequests = {}
+let _userQueue = []
 
 const formatMoment = (moment) => {
   return moment.format()
@@ -33,12 +37,12 @@ const logRateLimiting = (moment, address, interval, requests, status) => {
   logStream.write('[' + formatMoment(moment) + ']{ Address: ' + address + ', interval: ' + interval + 'ms, requests: ' + requests + ', status: ' + status + ' }\n')
 }
 
-const rateLimiting = (req, res, next, logging, limit, interval) => {
-  const address = Crypto.SHA256(req.connection.remoteAddress).toString(Crypto.enc.Hex);
+const rateLimiting = (req, res, next, logging, limit, interval, userTableMaxSize) => {
+  const address = hash(req.connection.remoteAddress)
   const now = moment()
-  const addressObject = _rlAddressToRequests[address]
+  const addressObject = _rlAddressToRequests[address]  
   if (!addressObject) {
-    addAddressToRequests(address, 1, now, now)
+    addUser(address, userTableMaxSize, now)
     return false
   }
 
@@ -47,7 +51,8 @@ const rateLimiting = (req, res, next, logging, limit, interval) => {
   const diffSeconds = now.diff(startRequestAt)
   const limitDenominator = (_totalActiveUsers > 0 ? _totalActiveUsers : 1) //1 if there is no dynamic rate limiting
   const requestLimit = limit/limitDenominator
-  if (diffSeconds < interval && requests > requestLimit) {
+
+  if (diffSeconds < interval && requests >= requestLimit) {
     addAddressToRequests(address, requests + 1, now, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, interval, _rlAddressToRequests[address].requests, 'ended')
     return true
@@ -94,13 +99,36 @@ const getAddresses = () => {
   return _rlAddressToRequests
 }
 
-const setTotalActiveUsers = (req) => {
-  const address = req.connection.remoteAddress
-  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
 
-  if(!lastRequestAt || lastRequestAt.diff(_lastActiveTimeout) < 0){ //The last connection was before we zeroed the totalActiveUsers field
+const hash = (address) => {
+  return Crypto.SHA256(address).toString(Crypto.enc.Hex)
+}
+
+const setTotalActiveUsers = (req) => {
+  const address = hash(req.connection.remoteAddress)
+  if(!userActive(address)){ //The last connection was before we zeroed the totalActiveUsers field
     _totalActiveUsers++
   }
+}
+
+const userActive = (address) => {  
+  const lastRequestAt = _rlAddressToRequests[address] && _rlAddressToRequests[address].lastRequestAt
+  return (lastRequestAt && lastRequestAt.diff(_lastActiveTimeout) >= 0)
+}
+
+const removeUser = (address) => {
+  if (userActive(address)) { //The last connection was after we zeroed the totalActiveUsers field
+    _totalActiveUsers--
+  }
+  _rlAddressToRequests[address] && delete _rlAddressToRequests[address]
+}
+const addUser = (address, userTableMaxSize, now) => {
+  if (Object.keys(_rlAddressToRequests).length >= userTableMaxSize) { //We have reached an overflow scenario
+    const addressToRemove = _userQueue.shift()
+    removeUser(addressToRemove)
+  }
+  _userQueue.push(address)
+  addAddressToRequests(address, 1, now, now)
 }
 
 const init = (HTTPServer, serverConfig) => {
@@ -118,12 +146,15 @@ const init = (HTTPServer, serverConfig) => {
   config.userActiveTimeout = config.dynamic && serverConfig && !isNaN(serverConfig.userActiveTimeout) ? serverConfig.userActiveTimeout : USER_ACTIVE_TIMEOUT_DEFAULT
   config.limit = config.dynamic && serverConfig && !isNaN(serverConfig.requestLimit) ? serverConfig.requestLimit : LIMIT_DEFAULT
   config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
+  config.userTableMaxSize = serverConfig && !isNaN(serverConfig.userTableMaxSize) ? serverConfig.userTableMaxSize : USER_TABLE_MAX_SIZE_DEFAULT
+  config.userTableClearTimeout = serverConfig && !isNaN(serverConfig.userTableClearTimeout) ? serverConfig.userTableClearTimeout : USER_TABLE_CLEAR_TIMEOUT
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
   config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
   
   if (config.sl || config.all) {
     slowloris(HTTPServer, config.headerTimeout)
   }
+
   return config
 }
 
@@ -136,12 +167,18 @@ const protect = (config) => async (req, res, next) => {
     _totalActiveUsers = 0
     _lastActiveTimeout = moment()
   }
+
+  if(config.rl && now.diff(_lastUserTableClear) > config.userTableClearTimeout){
+    _rlAddressToRequests = {}
+    _userQueue = []
+    _lastUserTableClear = moment()
+  }
   
   if ((config.rl || config.all) && config.dynamic) {
     setTotalActiveUsers(req)
   }
   
-  if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval)) ||
+  if (((config.rl || config.all) && rateLimiting(req, res, next, config.logging, config.limit, config.interval, config.userTableMaxSize)) ||
       ((config.r || config.all) && await rudy(req, config.rtimeout, config.logging))) {
     res.connection.destroy()
     return res.end()
