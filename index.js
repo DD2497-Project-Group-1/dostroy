@@ -21,9 +21,9 @@ const logStream = fs.createWriteStream('/tmp/express-requests-' + logSession + '
 
 let _totalActiveUsers = 0 // The amount of active users reset every now and then (default 30 sec)
 let _lastActiveTimeout = moment()
+let _lastUserTableClear = moment()
 let _rlAddressToRequests = {}
 let _userQueue = []
-let _clearIPTableInterval
 
 const formatMoment = (moment) => {
   return moment.format()
@@ -52,7 +52,7 @@ const rateLimiting = (req, res, next, logging, limit, interval, userTableMaxSize
   const limitDenominator = (_totalActiveUsers > 0 ? _totalActiveUsers : 1) //1 if there is no dynamic rate limiting
   const requestLimit = limit/limitDenominator
 
-  if (diffSeconds < interval && requests > requestLimit) {
+  if (diffSeconds < interval && requests >= requestLimit) {
     addAddressToRequests(address, requests + 1, now, now)
     logging && logRateLimiting(_rlAddressToRequests[address].startRequestAt, address, interval, _rlAddressToRequests[address].requests, 'ended')
     return true
@@ -101,44 +101,34 @@ const getAddresses = () => {
 
 
 const hash = (address) => {
-  return Crypto.SHA256(address).toString(Crypto.enc.Hex);
-
+  return Crypto.SHA256(address).toString(Crypto.enc.Hex)
 }
 
 const setTotalActiveUsers = (req) => {
   const address = hash(req.connection.remoteAddress)
-  incrementActiveUsers(address)
-}
-
-incrementActiveUsers = (address) => {
   if(!userActive(address)){ //The last connection was before we zeroed the totalActiveUsers field
     _totalActiveUsers++
   }
 }
 
-decrementActiveUsers = (address) => {
-  if (userActive(address)) { //The last connection was after we zeroed the totalActiveUsers field
-    _totalActiveUsers--
-  }
-}
-
 const userActive = (address) => {  
-  const lastRequestAt = _rlAddressToRequests[address] ? _rlAddressToRequests[address].lastRequestAt : null
+  const lastRequestAt = _rlAddressToRequests[address] && _rlAddressToRequests[address].lastRequestAt
   return (lastRequestAt && lastRequestAt.diff(_lastActiveTimeout) >= 0)
 }
 
 const removeUser = (address) => {
-  decrementActiveUsers(address) //If user is active we must decrement the active users field
+  if (userActive(address)) { //The last connection was after we zeroed the totalActiveUsers field
+    _totalActiveUsers--
+  }
   delete _rlAddressToRequests[address]
-  
 }
 
 const addUser = (address, userTableMaxSize, now) => {
-  _userQueue.push(address)
   if (Object.keys(_rlAddressToRequests).length >= userTableMaxSize) { //We have reached an overflow scenario
-    let addressToRemove = _userQueue.shift()
+    const addressToRemove = _userQueue.shift()
     removeUser(addressToRemove)
   }
+  _userQueue.push(address)
   addAddressToRequests(address, 1, now, now)
 }
 
@@ -158,21 +148,15 @@ const init = (HTTPServer, serverConfig) => {
   config.limit = config.dynamic && serverConfig && !isNaN(serverConfig.requestLimit) ? serverConfig.requestLimit : LIMIT_DEFAULT
   config.interval = config.dynamic && serverConfig && !isNaN(serverConfig.requestInterval) ? serverConfig.requestInterval : INTERVAL_DEFAULT
   config.userTableMaxSize = serverConfig && !isNaN(serverConfig.userTableMaxSize) ? serverConfig.userTableMaxSize : USER_TABLE_MAX_SIZE_DEFAULT
+  config.userTableClearTimeout = serverConfig && !isNaN(serverConfig.userTableClearTimeout) ? serverConfig.userTableClearTimeout : USER_TABLE_CLEAR_TIMEOUT
   config.logging = serverConfig && serverConfig.logging ? serverConfig.logging : LOGGING_DEFAULT
   config.headerTimeout = serverConfig && serverConfig.headerTimeout ? serverConfig.headerTimeout : HEADER_TIMEOUT_DEFAULT
-  const userTableClearTimeout = serverConfig && !isNaN(serverConfig.userTableClearTimeout) ? serverConfig.userTableClearTimeout : USER_TABLE_CLEAR_TIMEOUT
   
   if (config.sl || config.all) {
     slowloris(HTTPServer, config.headerTimeout)
   }
-  if(config.rl && !_clearIPTableInterval) {
-    _clearIPTableInterval = setInterval(() => {
-      console.log("USER IP TABLE CLEARED");
-      
-      _rlAddressToRequests = {}
-      _userQueue = []
-    }, userTableClearTimeout);
-  }
+
+  _initCompleted = true
   return config
 }
 
@@ -183,6 +167,12 @@ const protect = (config) => async (req, res, next) => {
   
   if(config.dynamic && now.diff(_lastActiveTimeout) > config.userActiveTimeout){
     _totalActiveUsers = 0
+    _lastActiveTimeout = moment()
+  }
+
+  if(config.rl && now.diff(_lastUserTableClear) > config.userTableClearTimeout){
+    _rlAddressToRequests = {}
+    _userQueue = []
     _lastActiveTimeout = moment()
   }
   
