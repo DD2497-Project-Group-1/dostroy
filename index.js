@@ -122,7 +122,6 @@ const removeUser = (address) => {
   }
   _rlAddressToRequests[address] && delete _rlAddressToRequests[address]
 }
-
 const addUser = (address, userTableMaxSize, now) => {
   if (Object.keys(_rlAddressToRequests).length >= userTableMaxSize) { //We have reached an overflow scenario
     const addressToRemove = _userQueue.shift()
