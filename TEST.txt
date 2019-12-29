@@ -7,7 +7,7 @@ Four different scenarios can be tested with our DoS mitigation tool dostroy:
 Requirements:
 - Node.js installed (≥ v8.15.0).
 - npm installed (≥ v6.10.2).
-- Preferrably two machine to run the tests on as behaviour can't be guaranteed when the attacker and target is the same computer.
+- Preferably two machines to run the tests on as behaviour can't be guaranteed when the attacker and target is the same computer.
 
 Initial setup:
 1. Clone the following repository on computer 1:
@@ -31,8 +31,8 @@ Testing Slowloris:
 3. On computer 2, go to the slowloris repository. In the file index.js (line 6), change the variable host to the IP address of computer 1.
 4. Start the application by running node index.js. You will be asked for the port (it's 3000) and the number of connections you want to start (about 150 should work).
 5. Try to visit the server in your browser. It should now be under attack and not be able to visit.
-6. On computer 1, activate slowloris prevention by chaning the config object to slowloris: true. Start the server again.
-7. On computer 2, run the slorlowis tool again.
+6. On computer 1, activate slowloris prevention by changing the config object to slowloris: true. Start the server again.
+7. On computer 2, run the slowloris tool again.
 8. Visit the server to see that the slowloris attack is now prevented and you're able to visit the page.
 
 Testing RUDY:
@@ -46,7 +46,7 @@ Testing RUDY:
 8. Visit the server to see that the slowloris attack is now prevented and you're able to visit the page.
 
 Testing Generic error handling:
-1. On computer 1, deactive error handling by removing line 48 in example-server/server/server.js.
+1. On computer 1, deactivate error handling by removing line 48 in example-server/server/server.js.
 2. Start the server.
 3. On computer 2, visit [IP of computer 1]:3000/error?param=-1. You should now see an error containing information about computer 1.
 4. On computer 1, activate error handling by adding line 48 again and restart the server.
