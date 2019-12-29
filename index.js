@@ -120,7 +120,7 @@ const removeUser = (address) => {
   if (userActive(address)) { //The last connection was after we zeroed the totalActiveUsers field
     _totalActiveUsers--
   }
-  delete _rlAddressToRequests[address]
+  _rlAddressToRequests[address] && delete _rlAddressToRequests[address]
 }
 
 const addUser = (address, userTableMaxSize, now) => {
@@ -156,7 +156,6 @@ const init = (HTTPServer, serverConfig) => {
     slowloris(HTTPServer, config.headerTimeout)
   }
 
-  _initCompleted = true
   return config
 }
 
