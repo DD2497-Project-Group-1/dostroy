@@ -50,7 +50,6 @@ config = {
   requestInterval: int, 
   logging: boolean,
   headerTimeout: int,
-  errorHandling: boolean
 }
 ```
 ##### slowloris
@@ -86,9 +85,6 @@ Should logging be enabled?
 ##### headerTimeout
 The timeout in milliseconds when transmitting the header. If the timeout is exceeded the connection is dropped.
 *Default:* 1000
-##### errorHandling
-Whether dostroy should prevent server from crashing on unexpected errors.
-*Default:* false
 
 ## The Mitigations
 dostroy employs several techniques to mitigate different attacks. Here are the attacks dostroy aims to mitigate.
